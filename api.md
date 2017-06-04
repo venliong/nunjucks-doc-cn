@@ -647,7 +647,7 @@ env.render('{{ item|lookup }}', function(err, res) {
 
 因为你需要直接使用 parse api，并且需要手动分析初 AST，所以有一点麻烦。如果你希望做一些复杂的扩展这是必须的。所以介绍一下你会用到的方法：
 
-* `parseSignature([throwErrors], [noParens])` - 解析标签的参数。默认情况下，解析器会从括号左边解析到括号右边。但是自定义标签不应该时括号，所以将第二个参数设为 `true` 告诉解析器解析参数直到标签关闭。参数之间应该用逗号分隔，如 `{%  
+* `parseSignature([throwErrors], [noParens])` - 解析标签的参数。默认情况下，解析器会从括号左边解析到括号右边。但是自定义标签不应该时括号，所以将第二个参数设为 `true` 告诉解析器解析参数直到标签关闭。参数之间应该用逗号分隔，如 `{%    
   mytag foo, bar, baz=10 %}`。
 
 * `parseUntilBlocks(names)` - 解析内容直到下一个名为 `names` 的标签，非常有用解析标签之间的内容。
