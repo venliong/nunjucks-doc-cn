@@ -1,9 +1,4 @@
----
-layout: subpage
-title: FAQ
-pageid: faq
----
-{% raw %}
+
 
 # 常见问题
 
