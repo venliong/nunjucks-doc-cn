@@ -21,7 +21,7 @@ Nunjucks 支持与 Jinja 兼容，查看 [installJinjaCompat](/api.html#installj
 * `self` 变量
 * `for` 不支持 `if not` and `else`
 * `if i is divisibleby(3)` 式的条件判断
-* 可命名的结束区块： `{% endblock content %}`
+* 可命名的结束区块： ` { % endblock content % } `
 * 沙箱模式 (Sandboxed mode)
 * 行语句： `# for item in seq`
 
