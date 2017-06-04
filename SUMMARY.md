@@ -1,3 +1,8 @@
 # Summary
 
-* [First Chapter](chapter1.md)
+* [Introduction](README.md)
+* [Getting Started](getting-started.md)
+* [Templating](templating.md)
+* [API](api.md)
+* [FAQ](faq.md)
+
