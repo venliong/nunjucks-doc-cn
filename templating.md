@@ -1,707 +1,782 @@
+# 模板
 
-# API
+这里包括 Nunjuck 所有可用的功能。
 
-Nunjucks 的 API 包括渲染模板，添加过滤器和扩展，自定义模板加载器等等。
+> Nunjucks 是
+> [jinja2](http://jinja.pocoo.org/docs/) 的 javascript 的实现，所以如果此文档有什么缺失，你可以直接查看 [jinja2 的文档](http://jinja.pocoo.org/docs/templates/)，不过两者之间还存在一些[差异](http://mozilla.github.io/nunjucks/cn/faq.html)。
 
-**注意**: nunjucks并不是在沙盒中运行的，所以使用用户定义的模板可能存在风险。这可能导致的风险有：在服务器上运行时敏感数据被窃取，或是在客户端运行时遭遇跨站脚本攻击(详情请查看[这里](https://github.com/mozilla/nunjucks-docs/issues/17))。
+## 文件扩展名
 
-## Simple API
+虽然你可以用任意扩展名来命名你的Nunjucks模版或文件，但Nunjucks社区还是推荐使用`.njk`。
 
-如果你不需要深度定制，可以直接使用初级(higher-level) api 来加载和渲染模板。
-### render
-```js
-nunjucks.render(name, [context], [callback])
-```
-渲染模式时需要两个参数，模板名 **name** 和数据 **context**。如果 **callback** 存在，当渲染完成后会被调用，第一个参数是错误，第二个为返回的结果；如果不存在，`render` 方法会直接返回结果，错误时会抛错。更多查看[异步的支持](#asynchronous-support)。
+如果你在给Nunjucks开发工具或是编辑器上的语法插件时，请记得使用`.njk`扩展名。
 
-```js
-var res = nunjucks.render('foo.html');
+## 变量
 
-var res = nunjucks.render('foo.html', { username: 'James' });
+变量会从模板上下文获取，如果你想显示一个变量可以：
 
-nunjucks.render('async.html', function(err, res) {
-});
+```jinja
+{{ username }}
 ```
 
-### renderString
-```js
-nunjucks.renderString(str, context, [callback])
-```
-与 [`render`](#render) 类似，只是渲染一个字符串而不是渲染加载的模板。
+会从上下文查找 `username` 然后显示，可以像 javascript 一样获取变量的属性 (可使用点操作符或者中括号操作符)：
 
-```js
-var res = nunjucks.renderString('Hello {{ username }}', { username: 'James' });
+```jinja
+{{ foo.bar }}
+{{ foo["bar"] }}
 ```
 
-### compile
-```js
-nunjucks.compile(str, [env], [path]);
-```
-将给定的字符串编译成可重复使用的nunjucks模板对象。
+如果变量的值为 `undefined` 或 `null` 将不显示，引用到 undefined 或 null 对象也是如此 (如 `foo` 为 undefined，`{{ foo }}`, `{{
+foo.bar }}`, `{{ foo.bar.baz }}` 也不显示)。
 
+## 过滤器
 
-```js
-var template = nunjucks.compile('Hello {{ username }}');
-template.render({ username: 'James' });
-```
+过滤器是一些可以执行变量的函数，通过管道操作符 (`|`) 调用，并可接受参数。
 
-
-### configure
-```js
-nunjucks.configure([path], [opts]);
-```
-传入 **path** 指定存放模板的目录，**opts** 可让某些功能开启或关闭，这两个变量都是可选的。**path** 的默认值为当前的工作目录，**opts** 提供以下功能：
-
-* **autoescape** *(默认值: true)* 控制输出是否被转义，查看 [Autoescaping](#autoescaping)
-* **throwOnUndefined** *(default: false)* 当输出为 null 或 undefined 会抛出异常
-* **trimBlocks** *(default: false)* 自动去除 block/tag 后面的换行符
-* **lstripBlocks** *(default: false)* 自动去除 block/tag 签名的空格
-* **watch** *(默认值: false)* 当模板变化时重新加载。使用前请确保已安装可选依赖 *chokidar*。
-* **noCache** *(default: false)* 不使用缓存，每次都重新编译
-* **web** 浏览器模块的配置项
-  * **useCache** *(default: false)* 是否使用缓存，否则会重新请求下载模板
-  * **async** *(default: false)* 是否使用 ajax 异步下载模板
-* **express** 传入 express 实例初始化模板设置
-* **tags:** *(默认值: see nunjucks syntax)* 定义模板语法，查看 [Customizing Syntax](#customizing-syntax)
-
-`configure` 返回一个 `Environment` 实例, 他提供了简单的 api 添加过滤器 (filters) 和扩展 (extensions)，可在 `Environment` 查看更多的使用方法。
-
-**注意**: 简单的API (比如说上面的`nunjucks.render`) 通常会使用最近一次调用`nunjucks.configure`时的配置。由于这种做法是隐性的，它可能会渲染出意料之外的结果，所以在大多数情况下我们不推荐使用这类简单的API(特别是用到`configure`的情况);我们推荐使用`var env = nunjucks.configure(...)`创建一个独立的环境，并调用`env.render(...)`进行渲染。
-
-```js
-nunjucks.configure('views');
-
-// 在浏览器端最好使用绝对地址
-nunjucks.configure('/views');
-
-nunjucks.configure({ autoescape: true });
-
-nunjucks.configure('views', {
-    autoescape: true,
-    express: app,
-    watch: true
-});
-
-var env = nunjucks.configure('views');
-// do stuff with env
+```jinja
+{{ foo | title }}
+{{ foo | join(",") }}
+{{ foo | replace("foo", "bar") | capitalize }}
 ```
 
+第三个例子展示了链式过滤器，最终会显示 "Bar"，第一个过滤器将 "foo" 替换成 "bar"，第二个过滤器将首字母大写。
 
-### installJinjaCompat
-```js
-nunjucks.installJinjaCompat()
-```
-这个方法为了与 Jinja 更好的兼容，增加了一些适配 Python 的 API。但是 nunjucks 不是为了完全兼容 Jinja/Pyhton，这只为了帮助使用者查看。
+Nunjucks 提供了一些[内置的过滤器](#内置的过滤器)，你也可以[自定义过滤器](api#custom-filters)。
 
-增加了 `True` 和 `False`，与 js 的 `true` 和 `false` 相对应。并增加 Array 和 Object 使之适配 Python 风格的。[查看源码](https://github.com/mozilla/nunjucks/blob/master/src/jinja-compat.js)能看到所有功能。
+## 模板继承
 
+模板继承可以达到模板复用的效果，当写一个模板的时候可以定义 "blocks"，子模板可以覆盖他，同时支持多层继承。
 
-就是这么简单，如果希望自己定义模板加载等更多的个性化设置，那么可以继续往下看。
+如果有一个叫做 `parent.html` 的模板，如下所示：
 
-## Environment
+```jinja
+{% block header %}
+This is the default content
+{% endblock %}
 
-`Environment` 类用来管理模板，使用他可以加载模板，模板之间可以继承和包含，上面提到的 api 都是调用了 `Environment` 的 api。
+<section class="left">
+  {% block left %}{% endblock %}
+</section>
 
-你可以根据需要来定制，比如定制模板加载。
-
-
-### constructor
-```js
-new Environment([loaders], [opts])
-```
-实例化 `Environment` 时传入两个参数，一组 **loaders** 和配置项 **opts**。如果 **loaders** 不存在，则默认从当前目录或地址加载。**loaders** 可为一个或多个，如果传入一个数组，nunjucks 会按顺序查找直到找到模板。更多查看 [`Loader`](#loader)
-
-**opts** 的配置有 **autoescape**、**throwOnUndefined**、**trimBlocks** 和 **lstripBlocks**，在 [`configure`](#configure) 查看具体配置（express 和 watch 配置在这里不适用，而是在 [`env.express`](#express) 进行配置）。
-
-在 node 端使用 [`FileSystemLoader`](#filesystemloader) 加载模板，浏览器端则使用 [`WebLoader`](#webloader) 通过 http 加载（或使用编译后的模板）。如果你使用了 [`configure`](#configure) 的 api，nunjucks 会根据平台（node 或浏览器）自动选择对应的 loader。查看更多 [`Loader`](#loader)。
-
-```js
-// the FileSystemLoader is available if in node
-var env = new nunjucks.Environment(new nunjucks.FileSystemLoader('views'));
-
-var env = new nunjucks.Environment(new nunjucks.FileSystemLoader('views'),
-                          { autoescape: false });
-
-var env = new nunjucks.Environment([new nunjucks.FileSystemLoader('views'),
-                           new MyCustomLoader()]);
-
-// the WebLoader is available if in the browser
-var env = new nunjucks.Environment(new nunjucks.WebLoader('/views'));
+<section class="right">
+  {% block right %}
+  This is more content
+  {% endblock %}
+</section>
 ```
 
-### render
-```js
-env.render(name, [context], [callback])
-```
-渲染名为 **name** 的模板，使用 **context** 作为数据，如果 **callback** 存在，在完成时会调用，回调有两个参数：错误和结果（ 查看 [asynchronous support](#asynchronous-support)）。如果 **callback** 不存在则直接回返结果。
+然后再写一个模板继承他
 
-```js
-var res = nunjucks.render('foo.html');
+```jinja
+{% extends "parent.html" %}
 
-var res = nunjucks.render('foo.html', { username: 'James' });
+{% block left %}
+This is the left side!
+{% endblock %}
 
-nunjucks.render('async.html', function(err, res) {
-});
-```
-
-### renderString
-```js
-env.renderString(src, [context], [callback])
-```
-和 [`render`](#render) 相同，只是渲染一个字符串而不是加载的模块。
-
-```js
-var res = nunjucks.renderString('Hello {{ username }}', { username: 'James' });
+{% block right %}
+This is the right side!
+{% endblock %}
 ```
 
-### addFilter
-```js
-env.addFilter(name, func, [async])
+以下为渲染结果
+
+```jinja
+This is the default content
+
+<section class="left">
+  This is the left side!
+</section>
+
+<section class="right">
+  This is the right side!
+</section>
 ```
-添加名为 **name** 的自定义过滤器，**func** 为调用的函数，如果过滤器需要异步的，**async** 应该为 `true` （查看 [asynchronous support](#asynchronous-support))。查看 [Custom Filters](#custom-filters)。
 
-### getFilter
+你可以将继承的模板设为一个变量，这样就可以动态指定继承的模板。这个变量既可以是个指向模板文件的字符串，也可以是个模板编译后所生成的对象(需要添加上下文环境)。因此你可以通过设置上下文变量，从而在渲染时动态地改变所要继承的模板。
 
+```jinja
+{% extends parentTemplate %}
+```
+
+继承功能使用了 [`extends`](#extends) 和 [`block`](#block) 标签，[jinja2 文档](http://jinja.pocoo.org/docs/templates/#template-inheritance)中有更细节的描述。
+
+### super
+
+你可以通过调用`super`从而将父级区块中的内容渲染到子区块中。如果在前面的例子中你的子模板是这样的：
+
+```jinja
+{% block right %}
+{{ super() }}
+Right side!
+{% endblock %}
+```
+
+这个区块的渲染结果将是：
+
+```
+This is more content
+Right side!
+```
+
+## 标签
+
+标签是一些特殊的区块，它们可以对模板执行一些操作。Nunjucks 包含一些内置的标签，你也可以[自定义](api.html#custom-tags)。
+
+### if
+
+`if` 为分支语句，与 javascript 中的 `if` 类似。
+
+```jinja
+{% if variable %}
+  It is true
+{% endif %}
+```
+
+如果 `variable` 定义了并且为 true _(译者注：这里并非布尔值，和 javascript 的处理是一样的)_ 则会显示 "It is true"，否则什么也不显示。
+
+```jinja
+{% if hungry %}
+  I am hungry
+{% elif tired %}
+  I am tired
+{% else %}
+  I am good!
+{% endif %}
+```
+
+在[内联表达式](#if-表达式)(inline expression)中也可以使用 if。
+
+### for
+
+`for` 可以遍历数组 (arrays) 和对象 (dictionaries)。
+
+> 如果你使用的自定义模板加载器为异步的可查看 [`asyncEach`](#asynceach)
 
 ```js
-env.getFilter(name)
+var items = [{ title: "foo", id: 1 }, { title: "bar", id: 2}];
 ```
 
-
-
-获取过滤器，传入名字返回一个函数。
-
-### addExtension
-```js
-env.addExtension(name, ext)
-```
-添加一个名为 **name** 的扩展，**ext** 为一个对象，并存在几个指定的方法供系统调用，查看 [Custom Tags](#custom-tags)。
-
-### removeExtension
-```js
-env.removeExtension(name)
-```
-删除之前添加的扩展 **name**。
-
-### getExtension
-```js
-env.getExtension(name)
-```
-获取扩展，传入名字返回一个函数。
-
-### hasExtension
-```js
-env.hasExtension(name)
-```
-如果 **name** 扩展已经被添加，那返回 true。
-
-### addGlobal
-```js
-env.addGlobal(name, value)
-```
-添加一个全局变量，可以在所有模板使用。注意：这个会覆盖已有的 `name` 变量。
-
-### getGlobal
-```js
-env.getGlobal(name)
-```
-返回一个名为 **name** 的全局变量。
-
-### getTemplate
-```js
-env.getTemplate(name, [eagerCompile], [callback])
-```
-获取一个名为 **name** 的模板。如果 **eagerCompile** 为 `true`，模板会立即编译而不是在渲染的时候再编译。如果 **callback** 存在会被调用，参数为错误和模板，否则会直接返回。如果使用异步加载器，则必须使用异步的 api，内置的加载器不需要。查看 [asynchronous support](#asynchronous-support) 和 [loaders](#loader)。
-
-```js
-var tmpl = env.getTemplate('page.html');
-
-var tmpl = env.getTemplate('page.html', true);
-
-env.getTemplate('from-async-loader.html', function(err, tmpl) {
-});
-```
-
-### express
-```js
-env.express(app)
-```
-使用 nunjucks 作为 express 的模板引擎，调用后可正常使用 express。你也可以调用 [`configure`](#configure)，将 app 作为 express 参数传入。
-
-```js
-var app = express();
-env.express(app);
-
-app.get('/', function(req, res) {
-    res.render('index.html');
-});
-```
-
-### opts.autoescape
-```js
-env.opts.autoescape
-```
-你可以通过这个配置控制是否全局开启模板转义，这对于创建高级过滤（如 html 操作）非常有用。
-正常情况你可以返回 SafeString，输出保持和输入一致不做任何处理，但这只在很少场景下有用。
-
-
-## Template
-
-`Template` 是一个模板编译后的对象，然后进行渲染。通常情况下，`Environment` 已经帮你处理了，但你也可以自己进行处理。
-如果使用 `Template` 渲染模板时未指定 `Environment`，那么这个模板不支持包含 (include) 和继承 (inherit) 其他模板。
-
-
-### constructor
-```js
-new Template(src, [env], [path], [eagerCompile])
-```
-实例化 `Template` 时需要四个参数，**src** 为模板的字符串，`Environment` 的实例 **env**（可选）用来加载其他模板，**path** 为一个路径，在调试中使用，如果 **eagerCompile** 为 `true`，模板会立即编译而不是在渲染的时候再编译。
-
-```js
-var tmpl = new nunjucks.Template('Hello {{ username }}');
-
-tmpl.render({ username: "James" }); // -> "Hello James"
-```
-
-### render
-```js
-tmpl.render(context, [callback])
-```
-渲染模板，**context** 为数据，如果 **callback** 存在会在渲染完成后调用，参数为错误和结果 (查看 [asynchronous support](#asynchronous-support))，否则直接返回。
-
-## Loader
-
-加载器是一个对象，从资源（如文件系统或网络）中加载模板，以下为两个内置的加载器。
-A loader is an object that takes a template name and loads it from a
-source, such as the filesystem or network. The following two builtin
-loaders exist, each for different contexts.
-
-
-### FileSystemLoader
-```js
-new FileSystemLoader([searchPaths], [opt])
-```
-只在 node 端可用，他可从文件系统中加载模板，**searchPaths** 为查找模板的路径，可以是一个也可以是多个，默认为当前的工作目录。
-
-**opt** 为一个对象，包含如下属性：
-
-* **watch** - 如果为 `true`，当文件系统上的模板变化了，系统会自动更新他。使用前请确保已安装可选依赖 *chokidar*。
-* **noCache** - 如果为 `true`，不使用缓存，模板每次都会重新编译。
-
-```js
-// Loads templates from the "views" folder
-var env = new nunjucks.Environment(new nunjucks.FileSystemLoader('views'));
-```
-
-### WebLoader
-```js
-new WebLoader([baseURL], [opts])
-```
-只在浏览器端可用，通过 **baseURL**（必须为同域）加载模板，默认为当前相对目录。
-
-**opt** 为一个对象，包含如下属性：
-
-* **useCache** 如果为 `true`，模板将会永远缓存，你将看不到他们更新。缓存默认关闭，因为这样就无法监听变化并更新缓存。
-    记住，你应该在生产环境预编译模板。
-* **async** 如果为 `true`，模板会异步请求，而非同步，同时你必须使用异步 render API（调用 `render` 时传入一个 callback）。
-
-他还能加载预编译后的模板，自动使用这些模板而不是通过 http 获取，在生产环境应该使用预编译。查看 [Precompiling Templates](#precompiling)。
-
-```js
-// Load templates from /views
-var env = new nunjucks.Environment(new nunjucks.WebLoader('/views'))
-```
-
-
-### Writing a Loader
-
-你可以自己写一个更复杂一点的加载器（如从数据库加载），只需建一个对象，添加一个 `getSource(name)` 的方法，**name** 为模板名。
-
-```js
-function MyLoader(opts) {
-    // configuration
-}
-
-MyLoader.prototype.getSource = function(name) {
-    // load the template
-    // return an object with:
-    //   - src:     String. The template source.
-    //   - path:    String. Path to template.
-    //   - noCache: Bool. Don't cache the template (optional).
-}
-```
-
-如果你希望跟踪模板的更新，并当有更新时清除缓存，这样就有一点复杂了。但你可以继承 `Loader` 类，可以通过 `emit` 方法触发事件。
-
-```js
-var MyLoader = nunjucks.Loader.extend({
-    init: function() {
-        // setup a process which watches templates here
-        // and call `this.emit('update', name)` when a template
-        // is changed
-    }
-
-    getSource: function(name) {
-        // load the template
-    }
-});
-```
-
-#### Asynchronous
-
-这是最后一部分：异步加载器。到现在为止，所有的加载器都是同步，`getSource` 立即返回资源。这个的好处是用户不必强制使用异步 api，也不用担心异步模板的边缘问题。但是，你可以希望从数据库加载
-
-只需在 load 中添加 `async: true` 属性就可支持异步调用
-
-```js
-var MyLoader = nunjucks.Loader.extend({
-    async: true,
-
-    getSource: function(name, callback) {
-        // load the template
-        // ...
-        callback(err, res);
-    }
-});
-```
-
-记住现在必须使用异步 api，查看 [asynchronous support](#asynchronous-support)。
-
-
-  **注意**: 如果使用了异步加载器，你将不能在 `for` 循环中加载模块，但可以使用 `asyncEach` 替换之。`asyncEach` 和 `for` 相同，只是在异步的时候使用。更多查看 [Be Careful!](#be-careful!)。
-
-## Browser Usage
-
-在浏览器端使用 nunjucks 需要考虑更多，因为需要非常关注加载和编译时间。在服务端，模板一次编译后就缓存在内存中，就不用担心了。在浏览器端，你甚至不想编译他，因为会降低渲染的速度。
-
-解决方案是将模板预编译成 javascript，和普通的 js 一样加载。
-
-可能你想在开发时动态的加载模板，这样你可以在文件变化的时候马上看到而不需要预编译。Nunjucks 已经帮你适配了你想要的工作流。
-
-有一点必须遵守：**在生产环境一定要预编译模板**。为什么？不仅因为在页面加载时编译模板速度很慢，而且是**同步**加载模板的，会阻塞整个页面。这很慢，因为 nunjucks 模板不是异步的。
-
-### Recommended Setups
-
-在客户端，有两种最常用的方式来初始设置 nunjucks。注意这是两个不同的文件，其中一个包括编译器 nunjucks.js，另一个不包括 nunjucks-slim.js。查看 [Getting Started](getting-started.html) 区分两者。
-
-查看 [Precompiling](#precompiling) 了解预编译。
-
-#### Setup #1: only precompile in production
-
-这个方法可以让你在开发环境可以动态加载模板（可以马上看到变化），在生产环境使用预编译的模板。
-
-1. 使用 script 或模块加载器加载 [nunjucks.js](files/nunjucks.js)。
-2. 渲染模板 ([example](#simple-api))!
-3. 当发布到生产环境时，When pushing to production, 将模板[预编译](#precompiling) 成 js 文件。
-
-> 在生产环境中，你可以使用 `nunjucks-slim.js` 代替 `nunjucks.js` 进行优化，因为你使用了预编译的模板。
-> `nunjucks-slim.js` 只有 8K 而不是 20K，因为不包括编译器。
-> 但是这使初始设置复杂化了，因为在开发和生产环境需要不同的 js 文件，是否值得完全在你如何使用。
-
-#### Setup #2: always precompile
-
-这个方法是在开发和生产环境都使用预编译的模板，这样可以简化初始设置。但是在开发时，你需要一些工具来自动预编译，而不是手动编译。
-
-1. 开发时，使用 [grunt](https://github.com/jlongster/grunt-nunjucks)或[gulp](https://github.com/sindresorhus/gulp-nunjucks) 监听文件目录，当文件变化后自动编译成 js 文件。
-2. 使用 script 或模块加载器加载 [nunjucks-slim.js](files/nunjucks-slim.js) 和你编译的 js 文件（如 `templates.js`）。
-3. 渲染模板 ([example](#simple-api))!
-
-使用这个方法，开发和生产环境无区别，只需提交 templates.js 并部署到生产环境。
-
-## Precompiling
-
-使用 `nunjucks-precompile` 脚本来预编译模板，可传入一个目录或一个文件，他将把所有的模板生成 javascript。
-
-```
-// Precompiling a whole directory
-$ nunjucks-precompile views > templates.js
-
-// Precompiling individual templates
-$ nunjucks-precompile views/base.html >> templates.js
-$ nunjucks-precompile views/index.html >> templates.js
-$ nunjucks-precompile views/about.html >> templates.js
-```
-
-你只需要在页面上加载 `templates.js`，系统会自动使用预编译的模板，没有改变的必要。
-
-这个脚本还有很多可选项，直接调用 `nunjucks-precompile` 可以看到更多信息。注意**所有的异步过滤器需要当参数传入**，因为编译时需要他们，你可以使用 `-a` 参数来传入（如 `-a foo,bar,baz`）。如果只使用同步过滤器则不需要处理。
-
-这个脚本无法指定扩展，所以你需要使用如下的预编译 api。
-
-### API
-
-如果你希望通过代码来预编译模板，nunjucks 也提供了 api，特别是在使用扩展和异步过滤器的时候需要使用这些 api。可以将 `Environment` 的实例传给预编译器，其中将包括扩展和过滤器。你需要在客户端和服务器使用同一个 `Environment` 对象保证同步。
-
-
-### precompile
-```js
-nunjucks.precompile(path, [opts])
-```
-传入 **path** 预编译一个文件或目录，**opts** 为如下的一些配置：
-
-* **name**: 模板的名字，当编译一个字符串的时候需要，如果是一个文件则是可选的（默认为 **path**）,如果是目录名字会自动生成。
-* **asFunction**: 生成一个函数
-* **force**: 如果出错还继续编译
-* **env**: `Environment` 的实例
-* **include**: 包括额外的文件和文件夹 (folders are auto-included, files are auto-excluded)
-* **exclude**: 排除额外的文件和文件夹 (folders are auto-included, files are auto-excluded)
-* **wrapper**: `function(templates, opts)` 自定义预编译模板的输出格式。这个函数必须返回一个字符串
-    * **templates**: 由对象组成的，带有下列属性的数组:
-        * **name**: 模板名称
-        * **template**: 编译后的模板所生成的，运行在javascript上的字符串源码
-    * **opts**: 上面所有配置选项所组成的对象
-
-```js
-var env = new nunjucks.Environment();
-
-// extensions must be known at compile-time
-env.addExtension('MyExtension', new MyExtension());
-
-// async filters must be known at compile-time
-env.addFilter('asyncFilter', function(val, cb) {
-  // do something
-}, true);
-
-nunjucks.precompile('/dir/to/views', { env: env });
-```
-
-
-### precompileString
-```js
-nunjucks.precompileString(str, [opts])
-```
-和 [`precompile`](#precompile) 相同，只是编译字符串。
-
-
-## Asynchronous Support
-
-如果你对异步渲染感兴趣才需要看这节，并没有性能上的优势，只是支持异步的过滤器和扩展，如果你不关注异步，那么应该使用同步 api，如 `var res = env.render('foo.html');`。你不必每次都写 `callback`，这就是为什么在所有的渲染函数中是一个可选项。
-
-nunjucks 1.0 会提供一种异步渲染模板的方式，这意味着自定义的过滤器和扩展可以做些类似从数据库获取内容的操作，模板渲染会等待直到调用回调。
-
-模板加载器也可以异步，可使你从数据库或其他地方加载模板。查看 [Writing a Loader](#writing-a-loader)。如果你在使用一个异步的模板加载，你需要使用异步的 api。内置的加载器是同步的，但并没有性能问题，因为文件系统是可以缓存的，而浏览器端会将模板编译成 js。
-
-如果你使用了异步的，那么你需要使用异步的 api：
-
-```js
-nunjucks.render('foo.html', function(err, res) {
-   // check err and handle result
-});
-```
-
-了解更多异步相关的查看 [`filters`](#asynchronous1), [`extensions`](#asynchronous2) 和
-[`loaders`](#asynchronous).
-
-### Be Careful!
-
-Nunjucks 默认是同步的，因此你需要按照如下规则写异步模板：
-
-* 总是使用异步 api，调用 `render` 方法时应该有回调。
-* 在编译时需要提供异步过滤器和扩展，所以在预编译时(查看
-  [Precompiling](#precompiling))需要指定。
-* 如果你使用一个自定义的异步加载器，你不能在 `for` 中使用 include 模板，因为在 `for` 循环中会立即执行。而你需要使用 `asyncEach` 来循环，这和 `for` 的功能时相同的，但只用于异步场景。
-
-## Autoescaping
-
-在默认情况下，nunjuck 渲染时会按原样输出，如果开启了自动转义 (autoescaping)，nunjuck 会转义所有的输出，为了安全建议一直开启。
-
-自动转义在 nunjucks 中非常简单，你只需将 `autoescape` 为 `true` 传入 `Environment` 对象。
-
-```js
-var env = nunjucks.configure('/path/to/templates', { autoescape: true });
-```
-
-## Customizing Syntax
-
-如果你希望使用其他的 token 而不是 `{{`，其中包括变量、区块和注释，你可以使用 `tags` 来定义不同的 token：
-
-```js
-var env = nunjucks.configure('/path/to/templates', {
-  tags: {
-    blockStart: '<%',
-    blockEnd: '%>',
-    variableStart: '<$',
-    variableEnd: '$>',
-    commentStart: '<#',
-    commentEnd: '#>'
-  }
-});
-```
-
-使用这个 env，模板如下所示：
-
-```
+```jinja
+<h1>Posts</h1>
 <ul>
-<% for item in items %>
-  <li><$ item $></li>
-<% endfor %>
+{% for item in items %}
+  <li>{{ item.title }}</li>
+{% else %}
+  <li>This would display if the 'item' collection were empty</li>
+{% endfor %}
 </ul>
 ```
 
-## Custom Filters
+上面的示例通过使用`items`数组中的每一项的`title`属性显示了所有文章的标题。如果`items`数组是空数组的话则会渲染`else`语句中的内容。
 
-使用 `Environment` 的 `addFilter` 方法添加一个自定义的过滤器，过滤器时一个函数，第一个参数为目标元素，剩下的参数为传入过滤器的参数。
-
-```js
-var nunjucks = require('nunjucks');
-var env = new nunjucks.Environment();
-
-env.addFilter('shorten', function(str, count) {
-    return str.slice(0, count || 5);
-});
-```
-
-添加了一个 `shorten` 的过滤器，返回前 `count` 位数的字符，`count` 默认为 5，如下为如何使用：
-
-```jinja
-{# Show the first 5 characters #}
-A message for you: {{ message|shorten }}
-
-{# Show the first 20 characters #}
-A message for you: {{ message|shorten(20) }}
-```
-
-### Keyword/Default Arguments
-
-在[模板](templating#Keyword-Arguments)中说道，nunjucks 支持关键字参数，你可以在 filter 中使用他。
-
-所有的关键字参数会以最后一个参数传入，以下为使用了关键字参数的 `foo` 过滤器：
+你还可以遍历对象：
 
 ```js
-env.addFilter('foo', function(num, x, y, kwargs) {
-   return num + (kwargs.bar || 10);
-})
-```
-
-模板可如下使用：
-
-```jinja
-{{ 5 | foo(1, 2) }}          -> 15
-{{ 5 | foo(1, 2, bar=3) }}   -> 8
-```
-
-你*必须*在关键字参数之前传入所有的位置参数 (`foo(1)` 是有效的，而 `foo(1, bar=10)` 不是)，你不能使用将一个位置参数当作关键字参数来用 (如 `foo(1, y=1)`)。
-
-### Asynchronous
-
-异步过滤器接受一个回调继续渲染，调用 `addFilter` 时需传入第三个参数 `true`。
-
-```js
-var env = nunjucks.configure('views');
-
-env.addFilter('lookup', function(name, callback) {
-    db.getItem(name, callback);
-}, true);
-
-env.render('{{ item|lookup }}', function(err, res) {
-    // do something with res
-});
-```
-
-回调需要两个参数 `callback(err, res)`，`err` 可以为 null。
-
-注意：当预编译时，**你必须指定所有的异步过滤器**，查看 [Precompiling](#precompiling)。
-
-## Custom Tags
-
-你可以添加更多的自定义扩展，nunjucks 提供了 parser api 可以对模板做更多的事。
-
-注意：当预编译时，**你必须在编译时添加这些扩展**，你应该使用 [precompiling API](#api1) (或者 [grunt ](https://github.com/jlongster/grunt-nunjucks)或[gulp](https://github.com/sindresorhus/gulp-nunjucks)任务)，而不是预编译脚本。你需要创建一个 [`Environment`](#environment)
- 实例，添加扩展，传到预编译器中。
-
-一个扩展至少有两个字段 `tags` 和 `parse`，扩展注册一个标签名，如果运行到这个标签则调用 parse。
-
-`tags` 为这个扩展支持的一组标签名。`parse` 为一个函数，当编译时会解析模板。除此之外，还有一个特殊的节点名为 `CallExtension`，在运行时你可以调用本扩展的其他方法，下面会详细说明。
-
-因为你需要直接使用 parse api，并且需要手动分析初 AST，所以有一点麻烦。如果你希望做一些复杂的扩展这是必须的。所以介绍一下你会用到的方法：
-
-* `parseSignature([throwErrors], [noParens])` - 解析标签的参数。默认情况下，解析器会从括号左边解析到括号右边。但是自定义标签不应该时括号，所以将第二个参数设为 `true` 告诉解析器解析参数直到标签关闭。参数之间应该用逗号分隔，如 `{%
-  mytag foo, bar, baz=10 %}`。
-
-* `parseUntilBlocks(names)` - 解析内容直到下一个名为 `names` 的标签，非常有用解析标签之间的内容。
-
-parser API 还需要更多的文档，但现在对照上面的文档和下面的例子，你还可以看下[源码](https://github.com/mozilla/nunjucks/blob/master/src/parser.js)。
-
-最常用使用的是在运行时解析标签间的内容，就像过滤器一样，但是更灵活，因为不只是局限在一个表达式中。通常情况下你会解析模板，然后将内容传入回调。你可以使用 `CallExtension`，需要传扩展的实例，方法名，解析的参数和内容（使用 `parseUntilBlocks` 解析的）。
-
-例如，下面实现了从远程获取内容并插入的扩展：
-
-```js
-function RemoteExtension() {
-    this.tags = ['remote'];
-
-    this.parse = function(parser, nodes, lexer) {
-        // get the tag token
-        var tok = parser.nextToken();
-
-        // parse the args and move after the block end. passing true
-        // as the second arg is required if there are no parentheses
-        var args = parser.parseSignature(null, true);
-        parser.advanceAfterBlockEnd(tok.value);
-
-        // parse the body and possibly the error block, which is optional
-        var body = parser.parseUntilBlocks('error', 'endtruncate');
-        var errorBody = null;
-
-        if(parser.skipSymbol('error')) {
-            parser.skip(lexer.TOKEN_BLOCK_END);
-            errorBody = parser.parseUntilBlocks('endremote');
-        }
-
-        parser.advanceAfterBlockEnd();
-
-        // See above for notes about CallExtension
-        return new nodes.CallExtension(this, 'run', args, [body, errorBody]);
-    };
-
-    this.run = function(context, url, body, errorBody) {
-        var id = 'el' + Math.floor(Math.random() * 10000);
-        var ret = new nunjucks.runtime.SafeString('<div id="' + id + '">' + body() + '</div>');
-        var ajax = new XMLHttpRequest();
-
-        ajax.onreadystatechange = function() {
-            if(ajax.readyState == 4) {
-                if(ajax.status == 200) {
-                    document.getElementById(id).innerHTML = ajax.responseText;
-                }
-                else {
-                    document.getElementById(id).innerHTML = errorBody();
-                }
-            }
-        };
-
-        ajax.open('GET', url, true);
-        ajax.send();
-
-        return ret;
-    };
-}
-
-env.addExtension('RemoteExtension', new RemoteExtension());
-```
-
-模板可以这么写：
-
-```jinja
-{% remote "/stuff" %}
-  This content will be replaced with the content from /stuff
-{% error %}
-  There was an error fetching /stuff
-{% endremote %}
-```
-
-### Asynchronous
-
-如果是异步的可以使用 `CallExtensionAsync`，在运行时扩展有一个回调作为最后一个参数，模板渲染会等待回调返回。
-
-上面例子中的 `run` 如下使用
-
-```js
-this.run = function(context, url, body, errorBody, callback) {
-   // do async stuff and then call callback(err, res)
+var food = {
+  'ketchup': '5 tbsp',
+  'mustard': '1 tbsp',
+  'pickle': '0 tbsp'
 };
 ```
 
-如果你做了些有趣的东西的话，请记得把他们
-[添加到wiki中!](https://github.com/mozilla/nunjucks/wiki/Custom-Tags)
+```jinja
+{% for ingredient, amount in food %}
+  Use {{ amount }} of {{ ingredient }}
+{% endfor %}
+```
+
+[`dictsort`](http://jinja.pocoo.org/docs/templates/#dictsort) 过滤器可将对象排序 (*new in 0.1.8*)
+
+除此之外，Nunjucks 会将数组解开，数组内的值对应到变量 (*new in 0.1.8*)
+
+```js
+var points = [[0, 1, 2], [5, 6, 7], [12, 13, 14]];
+```
+
+```jinja
+{% for x, y, z in points %}
+  Point: {{ x }}, {{ y }}, {{ z }}
+{% endfor %}
+```
+
+在循环中可获取一些特殊的变量
+
+* `loop.index`: 当前循环数 (1 indexed)
+* `loop.index0`: 当前循环数 (0 indexed)
+* `loop.revindex`: 当前循环数，从后往前 (1 indexed)
+* `loop.revindex0`: 当前循环数，从后往前 (0 based)
+* `loop.first`: 是否第一个
+* `loop.last`: 是否最后一个
+* `loop.length`: 总数
+
+### asyncEach
+
+> 这个是适用于异步模板，请读[文档](api.html#asynchronous-support)。
+
+`asyncEach` 为 `for` 的异步版本，只有当使用[自定义异步模板加载器](#asynchronous)的时候才使用，否则请不要使用。异步过滤器和扩展也需要他。如果你在循环中使用了异步过滤器的话，Nunjucks就会在内部自动将循环转换成 `asyncEach`。
+
+`asyncEach` 和 `for` 的使用方式一致，但他支持循环的异步控制。将两者区分的原因是性能，大部分人使用同步模板，将 `for` 转换成原生的 for 语句会快很多。
+
+编译时 nunjuck 不用关心模板是如何加载的，所以无法决定 `include` 是同步或异步。这也是为什么Nunjucks无法自动将普通的循环语句转换成异步循环语句的原因，所以如果你要使用异步模板加载器的话，就需要使用 `asyncEach`。
+
+```js
+// If you are using a custom loader that is async, you need asyncEach
+var env = new nunjucks.Environment(AsyncLoaderFromDatabase, opts);
+```
+```jinja
+<h1>Posts</h1>
+<ul>
+{% asyncEach item in items %}
+  {% include "item-template.html" %}
+{% endeach %}
+</ul>
+```
+
+### asyncAll
+
+> 这个是适用于异步模板，请读[文档](api.html#asynchronous-support)。
+
+`asyncAll` 和 `asyncEach` 类似，但 `asyncAll` 会并行的执行，并且每项的顺序仍然会保留。除非使用异步的过滤器、扩展或加载器，否则不要使用。
+
+如果你写了一个 `lookup` 的过滤器用来从数据库获取一些文本，使用 `asyncAll` 可以并行渲染。
+
+```jinja
+<h1>Posts</h1>
+<ul>
+{% asyncAll item in items %}
+  <li>{{ item.id | lookup }}</li>
+{% endall %}
+</ul>
+```
+
+如果 `lookup` 是一个异步的过滤器，那么可能会比较慢（如从磁盘获取些数据）。`asyncAll` 会减少执行的时间，他会并行执行所有的异步操作，当所有的操作完成后才会继续渲染页面。
+
+### macro
+
+宏 (`macro`) 可以定义可复用的内容，类似与编程语言中的函数，看下面的示例：
+
+```jinja
+{% macro field(name, value='', type='text') %}
+<div class="field">
+  <input type="{{ type }}" name="{{ name }}"
+         value="{{ value | escape }}" />
+</div>
+{% endmacro %}
+```
+
+现在 `field` 可以当作函数一样使用了：
+
+```jinja
+{{ field('user') }}
+{{ field('pass', type='password') }}
+```
+
+支持[关键字参数](#关键字参数)，通过链接查看具体使用方式。
+
+还可以从其他模板 [import](#import) 宏，可以使宏在整个项目中复用。
+
+**重要**：如果你使用异步 API，请注意你 **不能** 在宏中做任何异步的操作，因为宏只是像函数一样被简单地调用。将来我们可能会提供一种异步的宏调用方式，但现在这么使用是不被支持的。
+
+### set
+
+`set` 可以设置和修改变量。
+
+```jinja
+{{ username }}
+{% set username = "joe" %}
+{{ username }}
+```
+
+如果 `username` 初始化的时候为 "james', 最终将显示 "james joe"。
+
+可以设置新的变量，并一起赋值。
+
+```jinja
+{% set x, y, z = 5 %}
+```
+
+如果在顶级作用域使用 `set`，将会改变全局的上下文中的值。如果只在某个作用域 (像是include或是macro) 中使用，则只会影响该作用域。
+
+同样地，你也可以使用区块赋值将一个区块的内容储存在一个变量中。
+
+它的语法和标准的`set`语法相似，只不过你不需要用`=`。区块中从头到`{% endset %}`之间的内容都会被捕获，并作为值来使用。
+
+在某些情境下，你可以用这种语法来替代宏：
+
+```jinja
+{% set standardModal %}
+    {% include 'standardModalData.html' %}
+{% endset %}
+
+<div class="js-modal" data-modal="{{standardModal | e}}">
+```
+
+### extends
+
+`extends` 用来指定模板继承，被指定的模板为父级模板，查看[模板继承](#模板继承)。
+
+```jinja
+{% extends "base.html" %}
+```
+
+你可以将继承的模板设为一个变量，这样就可以动态指定继承的模板。这个变量既可以是个指向模板文件的字符串，也可以是个模板编译后所生成的对象(需要添加上下文环境)。因此你可以通过设置上下文变量，从而在渲染时动态地改变所要继承的模板。
+
+```jinja
+{% extends parentTemplate %}
+```
+
+`extends`也可以接受任意表达式，只要它最终返回一个字符串或是模板所编译成的对象：
+
+```jinja
+{% extends name + ".html" %}`.
+```
+
+### block
+
+区块(`block`) 定义了模板片段并标识一个名字，在模板继承中使用。父级模板可指定一个区块，子模板覆盖这个区块，查看[模板继承](#模板继承)。
+
+```jinja
+{% block css %}
+<link rel="stylesheet" href="app.css" />
+{% endblock %}
+```
+
+可以在循环中定义区块
+
+```jinja
+{% for item in items %}
+{% block item %}{{ item }}{% endblock %}
+{% endfor %}
+```
+
+子模板可以覆盖 `item` 区块并改变里面的内容。
+
+```jinja
+{% extends "item.html" %}
+
+{% block item %}
+The name of the item is: {{ item.name }}
+{% endblock %}
+```
+
+在区块中，你可以调用特殊的`super`函数。它会渲染父级区块中的内容。具体请查看[super](#super)。
+
+### include
+
+`include` 可引入其他的模板，可以在多模板之间共享一些小模板，如果某个模板已使用了继承那么 `include` 将会非常有用。
+
+```jinja
+{% include "item.html" %}
+```
+
+可在循环中引入模板
+
+```jinja
+{% for item in items %}
+{% include "item.html" %}
+{% endfor %}
+```
+
+这一点可以帮助我们把模板切分成更小的部分，从而使得在浏览器上，当我们需要改变页面时，我们可以渲染这些小部分的模板，而非一整个的大的模板。
+
+`include` 可以接受任意表达式，只要它最终返回一个字符串或是模板所编译成的对象: `{% include name + ".html" as obj %}`.
+
+在某些情况下，我们可能希望在模板文件不存在时不要抛出异常。对于这类情况，我们可以使用`ignore missing`来略过这些异常：
+
+```jinja
+{% include "missing.html" ignore missing %}
+```
+
+被包含的模版自身可以扩展(`extends`)另一个模版（因此你可以让一系列相关联的模版继承同一种结构）。
+一个被包含的模版并不会改变包含它的模版的区块结构，它有一个分离的继承树和块级命名空间。换言之，
+在渲染时，`include`并不 _不是_ 将被包含模版代码拉取到包含它的模版中的预处理器。相对的，它对被
+包含的模版触发了一次的分离渲染，然后再将渲染的结果引入。
+
+### import
+
+`import` 可加载不同的模板，可使你操作模板输出的数据，模板将会输出宏 (macro) 和在顶级作用域进行的赋值 (使用 [`set`](#set))。
+
+被 import 进来的模板没有当前模板的上下文，所以无法使用当前模板的变量，
+
+创建一个叫 `forms.html` 如下所示
+
+```jinja
+{% macro field(name, value='', type='text') %}
+<div class="field">
+  <input type="{{ type }}" name="{{ name }}"
+         value="{{ value | escape }}" />
+</div>
+{% endmacro %}
+
+{% macro label(text) %}
+<div>
+  <label>{{ text }}</label>
+</div>
+{% endmacro %}
+```
+
+我们可以 import 这个模板并将模板的输出绑定到变量 `forms` 上，然后就可以使用这个变量了：
+
+
+```jinja
+{% import "forms.html" as forms %}
+
+{{ forms.label('Username') }}
+{{ forms.input('user') }}
+{{ forms.label('Password') }}
+{{ forms.input('pass', type='password') }}
+```
+
+也可以使用 `from import` 从模板中 import 指定的值到当前的命名空间：
+
+```jinja
+{% from "forms.html" import input, label as description %}
+
+{{ description('Username') }}
+{{ input('user') }}
+{{ description('Password') }}
+{{ input('pass', type='password') }}
+```
+
+`import` 可以接受任意表达式，只要它最终返回一个字符串或是模板所编译成的对象: `{% import name + ".html" as obj %}`.
+
+### raw
+
+如果你想输出一些 Nunjucks 特殊的标签 (如 `{{`)，可以使用 `{% raw %}` 将所有的内容输出为纯文本。
+
+### filter
+
+`filter`区块允许我们使用区块中的内容来调用过滤器。不同于使用`|`语法，它会将区块渲染出的内容传递给过滤器。
+
+```jinja
+{% filter title %}
+may the force be with you
+{% endfilter %}
+
+{% filter replace("force", "forth") %}
+may the force be with you
+{% endfilter %}
+```
+
+切记：你不能在这些区块中进行任何异步操作。
+
+### call
+
+`call`区块允许你使用标签之间的内容来调用一个宏。这在你需要给宏传入大量内容时是十分有用的。在宏中，你可以通过`caller()`来获取这些内容。
+
+```jinja
+{% macro add(x, y) %}
+{{ caller() }}: {{ x + y }}
+{% endmacro%}
+
+{% call add(1, 2) -%}
+The result is
+{%- endcall %}
+```
+
+上面的例子将会输出"The result is: 3"。
+
+## 关键字参数
+
+jinja2 使用 Python 的关键字参数，支持函数，过滤器和宏。Nunjucks 会通过一个调用转换 (calling convention) 来支持。
+
+关键字参数如下：
+
+```jinja
+{{ foo(1, 2, bar=3, baz=4) }}
+```
+
+`bar` 和 `baz` 为关键字参数，Nunjucks 将他们转换成一个对象作为最后一个参数传入，等价于 javascript 的如下调用：
+
+```js
+foo(1, 2, { bar: 3, baz: 4})
+```
+
+因为这使一个标准的调用转换，所以适用于所有的符合预期的函数和过滤器。查看 [API 章节](api#Keyword-Arguments)获得更多信息。
+
+定义宏的时候也可以使用关键字参数，定义参数值时可设置默认值。Nunjucks 会自动将关键字参数与宏里定义的值做匹配。
+
+```jinja
+{% macro foo(x, y, z=5, w=6) %}
+{{ x }}, {{ y }}, {{ z }}, {{ w}}
+{% endmacro %}
+
+{{ foo(1, 2) }}        -> 1, 2, 5, 6
+{{ foo(1, 2, w=10) }}  -> 1, 2, 5, 10
+```
+
+在宏中还可以混合使用位置参数 (positional arguments) 和关键字参数。如示例，你可以将位置参数用作关键字参数：
+
+```jinja
+{{ foo(20, y=21) }}     -> 20, 21, 5, 6
+```
+
+你还可以用位置参数来替换关键字参数：
+
+```jinja
+{{ foo(5, 6, 7, 8) }}   -> 5, 6, 7, 8
+```
+
+如下示例，你可以跳过 ("skip") 位置参数：
+
+```jinja
+{{ foo(8, z=7) }}      -> 8, , 7, 6
+```
+
+## 注释
+
+你可以使用 `{#` and `#}` 来写注释，渲染时将会去除所有的注释。
+
+```jinja
+{# Loop through all the users #}
+{% for user in users %}...{% endfor %}
+```
+
+## 空白字符控制
+
+模板在正常情况会将变量 (variable) 和标签区块 (tag blocks) 周围的空白字符完全输出。有时，你不想输出一些额外的空白字符，但代码又需要一些空白字符来显得整洁。
+
+你可以在开始和结束区块 (start or end block tag) 添加 (`-`) 来去除前面和后面的空白字符。
+
+```jinja
+{% for i in [1,2,3,4,5] -%}
+  {{ i }}
+{%- endfor %}
+```
+
+上面准确的输出为 "12345"，`-%}` 会去除标签右侧的空白字符，`{%-` 会去除标签之前的空白字符。
+
+## 表达式
+
+你可以使用和 javascript 一样的字面量。
+
+* Strings: `"How are you?"`, `'How are you?'`
+* Numbers: `40`, `30.123`
+* Arrays: `[1, 2, "array"]`
+* Dicts: `{ one: 1, two: 2 }`
+* Boolean: `true`, `false`
+
+### 运算 (Math)
+
+Nunjucks 支持运算 (但尽量少用，把逻辑放在代码中)，可使用以下操作符：
+
+* Addition: `+`
+* Subtraction: `-`
+* Division: `/`
+* Division and integer truncation: `//`
+* Division remainder: `%`
+* Multiplication: `*`
+* Power: `**`
+
+可以如下使用：
+
+```jinja
+{{ 2 + 3 }}       (outputs 5)
+{{ 10/5 }}        (outputs 2)
+{{ numItems*2 }}
+```
+
+### 比较 (Comparisons)
+
+* `==`
+* `===`
+* `!=`
+* `!==`
+* `>`
+* `>=`
+* `<`
+* `<=`
+
+Examples:
+
+```jinja
+{% if numUsers < 5 %}...{% endif %}
+{% if i == 0 %}...{% endif %}
+```
+
+### Logic
+
+* `and`
+* `or`
+* `not`
+* 可使用大括号来分组
+
+Examples:
+
+```jinja
+{% if users and showUsers %}...{% endif %}
+{% if i == 0 and not hideFirst %}...{% endif %}
+{% if (x < 5 or y < 5) and foo %}...{% endif %}
+```
+
+### If 表达式
+
+和 javascript 的三元运算符 (ternary operator) 一样，可使用 if 的内联表达式：
+
+```jinja
+{{ "true" if foo else "false" }}
+```
+
+当 foo 为 true 的时候最终输出 "true" 否则为 "false"，对于获取默认值的时候非常有用：
+
+```jinja
+{{ baz(foo if foo else "default") }}
+```
+
+### 函数调用 (Function Calls)
+
+如果你传入一个函数，则可以直接调用
+
+```jinja
+{{ foo(1, 2, 3) }}
+```
+
+### 正则表达式
+
+你可以像在JavaScript中一样创建一个正则表达式:
+
+```jinja
+{{ /^foo.*/ }}
+{{ /bar$/g }}
+```
+
+正则表达式所支持的标志如下。查阅[Regex on MDN](https://developer.mozilla.org/en/docs/Web/JavaScript/Reference/Global_Objects/RegExp)以获取更多信息。
+
+* `g`: 应用到全局
+* `i`: 不区分大小写
+* `m`: 多行模式
+* `y`: 粘性支持（sticky）
+
+## 自动转义 (Autoescaping)
+
+如果在环境变量中设置了 autoescaping，所有的输出都会自动转义，但可以使用 `safe` 过滤器，Nunjucks 就不会转义了。
+
+```jinja
+{{ foo }}           // &lt;span%gt;
+{{ foo | safe }}    // <span>
+```
+
+如果未开启 autoescaping，所有的输出都会如实输出，但可以使用 `escape` 过滤器来转义。
+
+```jinja
+{{ foo }}           // <span>
+{{ foo | escape }}  // &lt;span&gt;
+```
+
+## 全局函数 (Global Functions)
+
+以下为一些内置的全局函数
+
+### range([start], stop, [step])
+
+如果你需要遍历固定范围的数字可以使用 `range`，`start` (默认为 0) 为起始数字，`stop` 为结束数字，`step` 为间隔 (默认为 1)。
+
+```jinja
+{% for i in range(0, 5) -%}
+  {{ i }},
+{%- endfor %}
+```
+
+上面输出 `0,1,2,3,4`.
+
+### cycler(item1, item2, ...itemN)
+
+`cycler` 可以循环调用你指定的一系列的值。
+
+```jinja
+{% set cls = cycler("odd", "even") %}
+{% for row in rows %}
+  <div class="{{ cls.next() }}">{{ row.name }}</div>
+{% endfor %}
+```
+
+上面的例子中奇数行的 class 为 "odd"，偶数行的 class 为 "even"。你可以使用`current`属性来获取当前项（在上面的例子中对应`cls.current`）。
+
+### joiner([separator])
+
+当合并多项的时候，希望在他们之间又分隔符 (像逗号)，但又不希望第一项也输出。`joiner` 将输出分割符 (默认为 ",") 除了第一次调用。
+
+```jinja
+{% set comma = joiner() %}
+{% for tag in tags -%}
+  {{ comma() }} {{ tag }}
+{%- endfor %}
+```
+
+如果 `tags` 为 `["food", "beer", "dessert"]`, 上面将输出 `food, beer, dessert`。
+
+## 内置的过滤器
+
+Nunjucks已经实现了jinja中的大部分过滤器，同时也新增了一些属于自己的过滤器。
+我们需要为这些过滤器编写文档。下面是一部分过滤器的文档，其他的你可以点击链接查看jinja上的文档。
+
+### default(value, default, [boolean])
+
+(简写为 `d`)
+
+如果`value`全等于`undefined`则返回`default`，否则返回`value`。
+如果`boolean`为true，则会在`value`为JavaScript中的假值时（比如：false, ""等）返回`default`。
+
+**在2.0版本中，这个过滤器的默认表现与以前有所不同。在之前的版本中，它会把`boolean`的默认值
+  设置为true，所以传入任何假值都会返回`default`。在2.0中，默认只有值为`undefined`时会
+  返回`default`。如果你仍旧希望保持原来版本的表现的话，你可以给`boolean`传入`true`，或是
+  直接使用`value or default`。**
+
+### sort(arr, reverse, caseSens, attr)
+
+用JavaScript中的`arr.sort`函数排序`arr`。如果`reverse`为true，则会返回相反的
+排序结果。默认状态下排序不会区分大小写，但你可以将`caseSens`设置为true来让排序
+区分大小写。我们可以用`attr`来指定要比较的属性。
+
+### striptags (value, [preserve_linebreaks])
+
+类似于jinja中的[striptags](http://jinja.pocoo.org/docs/templates/#striptags).
+如果`preserve_linebreaks`为false（同时也是默认值），则会移去SGML/XML标签并用一个空格符
+替换临近的、连续的空白符号。如果`preserve_linebreaks`为true，则会尝试保留临近的空白符号。
+如果你希望使用管道操作符进行类似于`{{ text | striptags | nl2br }}`这样的操作时，你就会
+需要用到后一种。否则你还是应该使用默认的用法。
+
+### dump (object)
+
+在一个对象上调用`JSON.stringify`，并将结果输出到模板上。这在调试时很有用：`{{ foo | dump }}`。
+
+### 其他过滤器
+
+* [abs](http://jinja.pocoo.org/docs/templates/#abs)
+* [batch](http://jinja.pocoo.org/docs/templates/#batch)
+* [capitalize](http://jinja.pocoo.org/docs/templates/#capitalize)
+* [center](http://jinja.pocoo.org/docs/templates/#center)
+* [dictsort](http://jinja.pocoo.org/docs/templates/#dictsort)
+* [escape](http://jinja.pocoo.org/docs/templates/#escape) (简写为`e`)
+* [float](http://jinja.pocoo.org/docs/templates/#float)
+* [first](http://jinja.pocoo.org/docs/templates/#first)
+* [groupby](http://jinja.pocoo.org/docs/templates/#groupby)
+* [indent](http://jinja.pocoo.org/docs/templates/#indent)
+* [int](http://jinja.pocoo.org/docs/templates/#int)
+* [join](http://jinja.pocoo.org/docs/templates/#join)
+* [last](http://jinja.pocoo.org/docs/templates/#last)
+* [length](http://jinja.pocoo.org/docs/templates/#length)
+* [list](http://jinja.pocoo.org/docs/templates/#list)
+* [lower](http://jinja.pocoo.org/docs/templates/#lower)
+* [random](http://jinja.pocoo.org/docs/templates/#random)
+* [rejectattr](http://jinja.pocoo.org/docs/templates/#rejectattr) (只接受单个参数)
+* [replace](http://jinja.pocoo.org/docs/templates/#replace) (第一个参数也可以接受
+  JavaScript中的正则表达式)
+* [reverse](http://jinja.pocoo.org/docs/templates/#reverse)
+* [round](http://jinja.pocoo.org/docs/templates/#round)
+* [safe](http://jinja.pocoo.org/docs/templates/#safe)
+* [selectattr](http://jinja.pocoo.org/docs/templates/#selectattr) (只接受单个参数)
+* [slice](http://jinja.pocoo.org/docs/templates/#slice)
+* [string](http://jinja.pocoo.org/docs/templates/#string)
+* [sum](http://jinja.pocoo.org/docs/dev/templates/#sum)
+* [title](http://jinja.pocoo.org/docs/templates/#title)
+* [trim](http://jinja.pocoo.org/docs/templates/#trim)
+* [truncate](http://jinja.pocoo.org/docs/templates/#truncate)
+* [upper](http://jinja.pocoo.org/docs/templates/#upper)
+* [urlencode](http://jinja.pocoo.org/docs/templates/#urlencode)
+* [urlize](http://jinja.pocoo.org/docs/templates/#urlize)
+* [wordcount](http://jinja.pocoo.org/docs/templates/#wordcount)
+
+你也可以直接[看代码](https://github.com/mozilla/nunjucks/blob/master/src/filters.js)。
 
