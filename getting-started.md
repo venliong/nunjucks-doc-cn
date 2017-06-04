@@ -1,7 +1,3 @@
----
-layout: subpage
-pageid: getting-started
----
 
 # 快速上手
 
