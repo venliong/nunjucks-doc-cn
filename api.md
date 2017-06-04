@@ -585,7 +585,7 @@ env.addFilter('shorten', function(str, count) {
 
 添加了一个 `shorten` 的过滤器，返回前 `count` 位数的字符，`count` 默认为 5，如下为如何使用：
 
-```jinja
+```
 {# Show the first 5 characters #}
 A message for you: {{ message|shorten }}
 
@@ -607,7 +607,7 @@ env.addFilter('foo', function(num, x, y, kwargs) {
 
 模板可如下使用：
 
-```jinja
+```
 {{ 5 | foo(1, 2) }}          -> 15
 {{ 5 | foo(1, 2, bar=3) }}   -> 8
 ```
@@ -714,7 +714,7 @@ env.addExtension('RemoteExtension', new RemoteExtension());
 
 模板可以这么写：
 
-```jinja
+```
 {% remote "/stuff" %}
   This content will be replaced with the content from /stuff
 {% error %}
