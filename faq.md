@@ -27,4 +27,3 @@ Nunjucks 支持与 Jinja 兼容，查看 [installJinjaCompat](/api.html#installj
 
 最后，自定义的 python 过滤器和扩展需要用 Javascript 重写。
 
-{% endraw %}
